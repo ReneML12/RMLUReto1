@@ -1,1 +1,3 @@
 # RMLUReto1
+ESTA ES LA RAMA DE QA
+ESTA ES LA RAMA DE develop
