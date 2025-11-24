@@ -1,10 +1,33 @@
-name: Hello Actions
+name: Repo Info
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  info:
     runs-on: ubuntu-latest
+
     steps:
-      - run: echo "¡Hola GitHub Actions!"
+      - name: Checkout completo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Mostrar ramas
+        run: |
+          git branch -a
+
+      - name: Fecha aproximada de creación de cada rama
+        run: |
+          for branch in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
+            fecha=$(git log $branch --reverse --format="%ad" | head -1)
+            echo "$branch --- $fecha"
+          done
+
+      - name: Fecha oficial de creación del repo (API)
+        env:
+          REPO: ${{ github.repository }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          fecha=$(curl -s -H "Authorization: Bearer $TOKEN" https://api.github.com/repos/$REPO | jq -r '.created_at')
+          echo "Repositorio creado el: $fecha"
