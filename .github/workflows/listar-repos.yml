@@ -1,0 +1,19 @@
+name: Listar repos de mi cuenta
+
+on:
+  workflow_dispatch:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obtener todos los repositorios
+      env:
+        TOKEN: ${{ secrets.PAT_TOKEN }}
+      run: |
+        curl -s -H "Authorization: token $TOKEN" \
+          "https://api.github.com/user/repos?per_page=100" > repos.json
+        
+        echo "📦 REPOSITORIOS ENCONTRADOS:"
+        cat repos.json | jq -r '.[] | "➡️ \(.full_name) | Creado: \(.created_at) | Privado: \(.private)"'
