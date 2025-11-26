@@ -10,12 +10,12 @@ jobs:
       TOKEN: ${{ secrets.PAT_TOKEN }}
       LONG_LIVED_BRANCHES: "main QA develop"
     steps:
-      - name: Instalar csv2xlsx via Go
+      - name: Instalar csv2xlsx (descargar binario Linux)
         run: |
-          # Instala la herramienta desde su repo
-          go install github.com/mentax/csv2xlsx@latest
-          # Asegura que el binario instalado esté en PATH
-          export PATH="$PATH:$(go env GOPATH)/bin"
+          # Descargar binario pre-compilado para Linux (amd64)
+          wget https://github.com/mentax/csv2xlsx/releases/latest/download/csv2xlsx_linux_amd64 -O csv2xlsx
+          chmod +x csv2xlsx
+          sudo mv csv2xlsx /usr/local/bin/csv2xlsx
 
       - name: Obtener todos los repositorios
         run: |
