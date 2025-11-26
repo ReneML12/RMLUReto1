@@ -1,4 +1,4 @@
-name: Listar repos de mi cuenta
+name: Listar repos de mi cuenta + ramas
 
 on:
   workflow_dispatch:
@@ -6,15 +6,24 @@ on:
 jobs:
   list:
     runs-on: ubuntu-latest
-
+    env:
+      TOKEN: ${{ secrets.PAT_TOKEN }}
     steps:
       - name: Obtener todos los repositorios
-        env:
-          TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           curl -s -H "Authorization: token $TOKEN" \
             "https://api.github.com/user/repos?per_page=100" > repos.json
-
           echo "📦 REPOSITORIOS ENCONTRADOS:"
           cat repos.json | jq -r '.[] | "➡️ \(.full_name) | Creado: \(.created_at) | Privado: \(.private)"'
-          
+
+      - name: Listar ramas por cada repo
+        run: |
+          for repo in $(jq -r '.[].full_name' repos.json); do
+            echo "-----"
+            echo "Repositorio: $repo"
+            # Obtener ramas via API
+            curl -s -H "Authorization: token $TOKEN" \
+              "https://api.github.com/repos/$repo/branches?per_page=100" \
+              | jq -r '.[].name' \
+              | sed 's/^/  - /'
+          done
