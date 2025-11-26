@@ -1,4 +1,4 @@
-name: Generar reporte de repos + ramas importantes
+name: Generar reporte de repos + ramas importantes (CSV → XLSX)
 
 on:
   workflow_dispatch:
@@ -10,6 +10,16 @@ jobs:
       TOKEN: ${{ secrets.PAT_TOKEN }}
       LONG_LIVED_BRANCHES: "main QA develop"
     steps:
+      - name: Instalar utilería para CSV → XLSX
+        run: |
+          # Por ejemplo, si hay un paquete instalable via apt / brew / cargo / go
+          # Aquí un ejemplo genérico, debes adaptarlo según la herramienta que uses
+          # Ejemplo: instalar csv2xlsx (si existiera como binario o script)
+          # o usar go instalar: go install github.com/mentax/csv2xlsx@latest
+          # O puedes usar pip + un script Python — depende de tu elección.
+          # Este paso puede variar según la herramienta.
+          echo "Instala aquí tu convertidor CSV->XLSX si es necesario"
+
       - name: Obtener todos los repositorios
         run: |
           curl -s -H "Authorization: token $TOKEN" \
@@ -25,19 +35,22 @@ jobs:
             branches=$(curl -s -H "Authorization: token $TOKEN" \
               "https://api.github.com/repos/$repo/branches?per_page=100" \
               | jq -r '.[].name')
-            # definir valores por defecto vacíos
             has_main=""
             has_QA=""
             has_develop=""
             if echo "$branches" | grep -xq "main"; then has_main="yes"; fi
             if echo "$branches" | grep -xq "QA"; then has_QA="yes"; fi
             if echo "$branches" | grep -xq "develop"; then has_develop="yes"; fi
-            # escribir línea en CSV
             echo "\"$repo\",\"$has_main\",\"$has_QA\",\"$has_develop\"" >> branches_report.csv
           done
 
-      - name: Subir reporte como artefacto
+      - name: Convertir CSV a XLSX
+        run: |
+          csv2xlsx -f branches_report.csv -o branches_report.xlsx
+          # O si usas otra herramienta, adapta el comando.
+
+      - name: Subir reporte XLSX como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: branches-report
-          path: branches_report.csv
+          name: branches-report-xlsx
+          path: branches_report.xlsx
