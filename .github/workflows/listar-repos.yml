@@ -1,4 +1,4 @@
-name: Listar repos de mi cuenta + ramas importantes
+name: Generar reporte de repos + ramas importantes
 
 on:
   workflow_dispatch:
@@ -14,35 +14,30 @@ jobs:
         run: |
           curl -s -H "Authorization: token $TOKEN" \
             "https://api.github.com/user/repos?per_page=100" > repos.json
-          echo "📦 REPOSITORIOS ENCONTRADOS:"
-          cat repos.json | jq -r '.[] | .full_name'
 
-      - name: Verificar ramas “de vida larga” en cada repo
+      - name: Iniciar CSV
         run: |
-          echo "=== Verificando ramas importantes por repositorio ==="
+          echo "repo,main,QA,develop" > branches_report.csv
+
+      - name: Verificar ramas por repo y llenar CSV
+        run: |
           for repo in $(jq -r '.[].full_name' repos.json); do
-            echo ""
-            echo "Repositorio: $repo"
-            # Obtener la lista de ramas
             branches=$(curl -s -H "Authorization: token $TOKEN" \
               "https://api.github.com/repos/$repo/branches?per_page=100" \
               | jq -r '.[].name')
-            
-            # Para cada rama de vida larga esperada, revisa si existe
-            missing=()
-            present=()
-            for b in $LONG_LIVED_BRANCHES; do
-              if echo "$branches" | grep -xq "$b"; then
-                present+=("$b")
-              else
-                missing+=("$b")
-              fi
-            done
-            
-            if [ ${#present[@]} -gt 0 ]; then
-              echo "  ✅ Tiene ramas esperadas: ${present[*]}"
-            fi
-            if [ ${#missing[@]} -gt 0 ]; then
-              echo "  ⚠️ Faltan ramas: ${missing[*]}"
-            fi
+            # definir valores por defecto vacíos
+            has_main=""
+            has_QA=""
+            has_develop=""
+            if echo "$branches" | grep -xq "main"; then has_main="yes"; fi
+            if echo "$branches" | grep -xq "QA"; then has_QA="yes"; fi
+            if echo "$branches" | grep -xq "develop"; then has_develop="yes"; fi
+            # escribir línea en CSV
+            echo "\"$repo\",\"$has_main\",\"$has_QA\",\"$has_develop\"" >> branches_report.csv
           done
+
+      - name: Subir reporte como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: branches-report
+          path: branches_report.csv
