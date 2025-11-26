@@ -1,4 +1,4 @@
-name: Listar repos de mi cuenta + ramas
+name: Listar repos de mi cuenta + ramas importantes
 
 on:
   workflow_dispatch:
@@ -8,22 +8,41 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TOKEN: ${{ secrets.PAT_TOKEN }}
+      LONG_LIVED_BRANCHES: "main QA develop"
     steps:
       - name: Obtener todos los repositorios
         run: |
           curl -s -H "Authorization: token $TOKEN" \
             "https://api.github.com/user/repos?per_page=100" > repos.json
           echo "📦 REPOSITORIOS ENCONTRADOS:"
-          cat repos.json | jq -r '.[] | "➡️ \(.full_name) | Creado: \(.created_at) | Privado: \(.private)"'
+          cat repos.json | jq -r '.[] | .full_name'
 
-      - name: Listar ramas por cada repo
+      - name: Verificar ramas “de vida larga” en cada repo
         run: |
+          echo "=== Verificando ramas importantes por repositorio ==="
           for repo in $(jq -r '.[].full_name' repos.json); do
-            echo "-----"
+            echo ""
             echo "Repositorio: $repo"
-            # Obtener ramas via API
-            curl -s -H "Authorization: token $TOKEN" \
+            # Obtener la lista de ramas
+            branches=$(curl -s -H "Authorization: token $TOKEN" \
               "https://api.github.com/repos/$repo/branches?per_page=100" \
-              | jq -r '.[].name' \
-              | sed 's/^/  - /'
+              | jq -r '.[].name')
+            
+            # Para cada rama de vida larga esperada, revisa si existe
+            missing=()
+            present=()
+            for b in $LONG_LIVED_BRANCHES; do
+              if echo "$branches" | grep -xq "$b"; then
+                present+=("$b")
+              else
+                missing+=("$b")
+              fi
+            done
+            
+            if [ ${#present[@]} -gt 0 ]; then
+              echo "  ✅ Tiene ramas esperadas: ${present[*]}"
+            fi
+            if [ ${#missing[@]} -gt 0 ]; then
+              echo "  ⚠️ Faltan ramas: ${missing[*]}"
+            fi
           done
