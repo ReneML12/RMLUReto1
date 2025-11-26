@@ -10,27 +10,22 @@ jobs:
       TOKEN: ${{ secrets.PAT_TOKEN }}
       LONG_LIVED_BRANCHES: "main QA develop"
     steps:
-      - name: Instalar Go y csv2xlsx
+      - name: Instalar csv2xlsx y generar reporte
         run: |
-          # Instalar csv2xlsx desde el repo
+          # Instala csv2xlsx desde Go
           go install github.com/mentax/csv2xlsx@latest
-          # Añadir binarios de Go al PATH
-          echo "PATH desde Go: $(go env GOPATH)/bin"
           export PATH="$PATH:$(go env GOPATH)/bin"
-          # Verificar que csv2xlsx esté instalado
-          csv2xlsx -h
+          # Verifica que el binario existe
+          csv2xlsx -h || (echo "csv2xlsx no se instaló correctamente" && exit 1)
 
-      - name: Obtener todos los repositorios
-        run: |
+          # Obtener todos los repositorios
           curl -s -H "Authorization: token $TOKEN" \
             "https://api.github.com/user/repos?per_page=100" > repos.json
 
-      - name: Iniciar CSV
-        run: |
+          # Crear CSV
           echo "repo,main,QA,develop" > branches_report.csv
 
-      - name: Verificar ramas por repo y llenar CSV
-        run: |
+          # Llenar CSV con presencia de ramas
           for repo in $(jq -r '.[].full_name' repos.json); do
             branches=$(curl -s -H "Authorization: token $TOKEN" \
               "https://api.github.com/repos/$repo/branches?per_page=100" \
@@ -44,8 +39,7 @@ jobs:
             echo "\"$repo\",\"$has_main\",\"$has_QA\",\"$has_develop\"" >> branches_report.csv
           done
 
-      - name: Convertir CSV a XLSX
-        run: |
+          # Convertir CSV a XLSX
           csv2xlsx -o branches_report.xlsx branches_report.csv
 
       - name: Subir reporte XLSX como artefacto
