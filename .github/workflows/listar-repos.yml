@@ -1,4 +1,4 @@
-name: Generar reporte de repos + ramas importantes (CSV → XLSX)
+name: Generar reporte de repos + ramas importantes + últimos commits (CSV → XLSX)
 
 on:
   workflow_dispatch:
@@ -15,28 +15,51 @@ jobs:
           # Instala csv2xlsx desde Go
           go install github.com/mentax/csv2xlsx@latest
           export PATH="$PATH:$(go env GOPATH)/bin"
-          # Verifica que el binario existe
           csv2xlsx -h || (echo "csv2xlsx no se instaló correctamente" && exit 1)
 
           # Obtener todos los repositorios
           curl -s -H "Authorization: token $TOKEN" \
             "https://api.github.com/user/repos?per_page=100" > repos.json
 
-          # Crear CSV
-          echo "repo,main,QA,develop" > branches_report.csv
+          # Crear CSV con nuevas columnas para fechas de commit
+          echo "repo,main,main_last_commit,QA,QA_last_commit,develop,develop_last_commit" > branches_report.csv
 
-          # Llenar CSV con presencia de ramas
-          for repo in $(jq -r '.[].full_name' repos.json); do
+          for full in $(jq -r '.[].full_name' repos.json); do
+            repo="$full"
+            # Lista ramas
             branches=$(curl -s -H "Authorization: token $TOKEN" \
               "https://api.github.com/repos/$repo/branches?per_page=100" \
               | jq -r '.[].name')
-            has_main=""
-            has_QA=""
-            has_develop=""
-            if echo "$branches" | grep -xq "main"; then has_main="si"; fi
-            if echo "$branches" | grep -xq "QA"; then has_QA="si"; fi
-            if echo "$branches" | grep -xq "develop"; then has_develop="si"; fi
-            echo "\"$repo\",\"$has_main\",\"$has_QA\",\"$has_develop\"" >> branches_report.csv
+
+            # Inicializa valores
+            has_main=""; last_main=""
+            has_QA="";   last_QA=""
+            has_develop=""; last_develop=""
+
+            # Para cada branch larga, si existe obtén último commit
+            if echo "$branches" | grep -xq "main"; then
+              has_main="si"
+              last_main=$(curl -s -H "Authorization: token $TOKEN" \
+                "https://api.github.com/repos/$repo/commits/main" \
+                | jq -r '.sha + " @ " + .commit.committer.date')
+            fi
+
+            if echo "$branches" | grep -xq "QA"; then
+              has_QA="si"
+              last_QA=$(curl -s -H "Authorization: token $TOKEN" \
+                "https://api.github.com/repos/$repo/commits/QA" \
+                | jq -r '.sha + " @ " + .commit.committer.date')
+            fi
+
+            if echo "$branches" | grep -xq "develop"; then
+              has_develop="si"
+              last_develop=$(curl -s -H "Authorization: token $TOKEN" \
+                "https://api.github.com/repos/$repo/commits/develop" \
+                | jq -r '.sha + " @ " + .commit.committer.date')
+            fi
+
+            # Escribe línea en CSV, comillas para proteger comas en campos
+            echo "\"$repo\",\"$has_main\",\"$last_main\",\"$has_QA\",\"$last_QA\",\"$has_develop\",\"$last_develop\"" >> branches_report.csv
           done
 
           # Convertir CSV a XLSX
@@ -45,5 +68,5 @@ jobs:
       - name: Subir reporte XLSX como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: branches-report-xlsx
+          name: branches-report-full
           path: branches_report.xlsx
