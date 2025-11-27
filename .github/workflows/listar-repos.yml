@@ -33,9 +33,9 @@ jobs:
             has_main=""
             has_QA=""
             has_develop=""
-            if echo "$branches" | grep -xq "main"; then has_main="yes"; fi
-            if echo "$branches" | grep -xq "QA"; then has_QA="yes"; fi
-            if echo "$branches" | grep -xq "develop"; then has_develop="yes"; fi
+            if echo "$branches" | grep -xq "main"; then has_main="si"; fi
+            if echo "$branches" | grep -xq "QA"; then has_QA="si"; fi
+            if echo "$branches" | grep -xq "develop"; then has_develop="si"; fi
             echo "\"$repo\",\"$has_main\",\"$has_QA\",\"$has_develop\"" >> branches_report.csv
           done
 
