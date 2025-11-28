@@ -1,72 +1,53 @@
-name: Generar reporte de repos + ramas importantes + últimos commits (CSV → XLSX)
+name: Listar ramas de todos los repos
 
 on:
   workflow_dispatch:
 
 jobs:
-  list:
+  listar-ramas:
     runs-on: ubuntu-latest
-    env:
-      TOKEN: ${{ secrets.PAT_TOKEN }}
-      LONG_LIVED_BRANCHES: "main QA develop"
+
     steps:
-      - name: Instalar csv2xlsx y generar reporte
+      - name: Checkout vacío
+        uses: actions/checkout@v4
+
+      - name: Listar repos y ramas
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Instala csv2xlsx desde Go
-          go install github.com/mentax/csv2xlsx@latest
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          csv2xlsx -h || (echo "csv2xlsx no se instaló correctamente" && exit 1)
+          echo "🔍 Obteniendo lista de repositorios..."
 
           # Obtener todos los repositorios
-          curl -s -H "Authorization: token $TOKEN" \
-            "https://api.github.com/user/repos?per_page=100" > repos.json
+          repos=$(gh repo list ReneML12 --limit 200 --json name --jq '.[].name')
 
-          # Crear CSV con nuevas columnas para fechas de commit
-          echo "repo,main,main_last_commit,QA,QA_last_commit,develop,develop_last_commit" > branches_report.csv
+          echo "📌 Repos encontrados:"
+          echo "$repos"
+          echo "-----------------------------------------"
 
-          for full in $(jq -r '.[].full_name' repos.json); do
-            repo="$full"
-            # Lista ramas
-            branches=$(curl -s -H "Authorization: token $TOKEN" \
-              "https://api.github.com/repos/$repo/branches?per_page=100" \
-              | jq -r '.[].name')
+          # Recorrer todos los repositorios
+          for repo in $repos; do
+            echo "📁 REPO: $repo"
+            echo "-----------------------------------------"
 
-            # Inicializa valores
-            has_main=""; last_main=""
-            has_QA="";   last_QA=""
-            has_develop=""; last_develop=""
+            # Obtener ramas del repo
+            branches=$(gh api repos/ReneML12/$repo/branches --jq '.[].name')
 
-            # Para cada branch larga, si existe obtén último commit
-            if echo "$branches" | grep -xq "main"; then
-              has_main="si"
-              last_main=$(curl -s -H "Authorization: token $TOKEN" \
-                "https://api.github.com/repos/$repo/commits/main" \
-                | jq -r '.sha + " @ " + .commit.committer.date')
+            # Validar si tiene ramas
+            if [ -z "$branches" ]; then
+              echo "⚠️ No se encontraron ramas en $repo"
+            else
+              echo "🌿 Ramas encontradas en $repo:"
+              for branch in $branches; do
+                # Obtener información detallada de cada rama
+                last_commit=$(gh api repos/ReneML12/$repo/branches/$branch --jq '.commit.sha')
+                last_date=$(gh api repos/ReneML12/$repo/commits/$last_commit --jq '.commit.author.date')
+
+                echo " - Rama: $branch"
+                echo "   Último commit: $last_commit"
+                echo "   Fecha del último commit: $last_date"
+              done
             fi
 
-            if echo "$branches" | grep -xq "QA"; then
-              has_QA="si"
-              last_QA=$(curl -s -H "Authorization: token $TOKEN" \
-                "https://api.github.com/repos/$repo/commits/QA" \
-                | jq -r '.sha + " @ " + .commit.committer.date')
-            fi
-
-            if echo "$branches" | grep -xq "develop"; then
-              has_develop="si"
-              last_develop=$(curl -s -H "Authorization: token $TOKEN" \
-                "https://api.github.com/repos/$repo/commits/develop" \
-                | jq -r '.sha + " @ " + .commit.committer.date')
-            fi
-
-            # Escribe línea en CSV, comillas para proteger comas en campos
-            echo "\"$repo\",\"$has_main\",\"$last_main\",\"$has_QA\",\"$last_QA\",\"$has_develop\",\"$last_develop\"" >> branches_report.csv
+            echo "========================================="
           done
 
-          # Convertir CSV a XLSX
-          csv2xlsx -o branches_report.xlsx branches_report.csv
-
-      - name: Subir reporte XLSX como artefacto
-        uses: actions/upload-artifact@v4
-        with:
-          name: branches-report-full
-          path: branches_report.xlsx
