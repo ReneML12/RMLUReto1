@@ -11,16 +11,44 @@ jobs:
       - name: Checkout vacío
         uses: actions/checkout@v4
 
-      - name: Listar repos y ramas
+      - name: Listar organizaciones y sus repos
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔍 Obteniendo lista de repositorios..."
+          echo "🏢 Obteniendo organizaciones del usuario..."
+          orgs=$(gh api user/memberships/orgs --jq '.[].organization.login')
 
-          # Obtener todos los repositorios
+          echo "-----------------------------------------"
+          echo "📌 Organizaciones encontradas:"
+          echo "$orgs"
+          echo "-----------------------------------------"
+
+          for org in $orgs; do
+            echo "🏛 ORGANIZACIÓN: $org"
+            echo "Repositorios en $org:"
+            echo "-----------------------------------------"
+
+            org_repos=$(gh repo list $org --limit 300 --json name --jq '.[].name')
+
+            if [ -z "$org_repos" ]; then
+              echo "⚠️ No se encontraron repos en esta organización."
+            else
+              echo "$org_repos"
+            fi
+
+            echo "========================================="
+          done
+
+      - name: Listar repos y ramas del usuario
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔍 Obteniendo lista de repositorios del usuario..."
+
+          # Obtener todos los repositorios del usuario
           repos=$(gh repo list ReneML12 --limit 200 --json name --jq '.[].name')
 
-          echo "📌 Repos encontrados:"
+          echo "📌 Repos encontrados del usuario:"
           echo "$repos"
           echo "-----------------------------------------"
 
@@ -50,4 +78,3 @@ jobs:
 
             echo "========================================="
           done
-
