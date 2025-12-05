@@ -18,17 +18,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          echo "🏢 Obteniendo organizaciones del usuario..."
+          echo " Obteniendo organizaciones del usuario..."
           
           orgs=$(gh api user/memberships/orgs --jq '.[].organization.login' || echo "")
 
           echo "-----------------------------------------"
-          echo "📌 Organizaciones encontradas:"
+          echo " Organizaciones encontradas:"
           echo "$orgs"
           echo "-----------------------------------------"
 
           if [ -z "$orgs" ]; then
-            echo "⚠️ No se encontraron organizaciones o tu token no tiene permisos 'read:org'."
+            echo " No se encontraron organizaciones o tu token no tiene permisos 'read:org'."
           else
             for org in $orgs; do
               echo "🏛 ORGANIZACIÓN: $org"
@@ -38,7 +38,7 @@ jobs:
               org_repos=$(gh repo list $org --limit 300 --json name --jq '.[].name')
 
               if [ -z "$org_repos" ]; then
-                echo "⚠️ No se encontraron repos en esta organización."
+                echo " No se encontraron repos en esta organización."
               else
                 echo "$org_repos"
               fi
