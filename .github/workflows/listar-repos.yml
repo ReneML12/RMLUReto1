@@ -11,64 +11,80 @@ jobs:
       - name: Checkout vacío
         uses: actions/checkout@v4
 
+      # -------------------------------------------------------------------
+      # 1. LISTAR ORGANIZACIONES Y SUS REPOS
+      # -------------------------------------------------------------------
       - name: Listar organizaciones y sus repos
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           echo "🏢 Obteniendo organizaciones del usuario..."
-          orgs=$(gh api user/memberships/orgs --jq '.[].organization.login')
+          
+          orgs=$(gh api user/memberships/orgs --jq '.[].organization.login' || echo "")
 
           echo "-----------------------------------------"
           echo "📌 Organizaciones encontradas:"
           echo "$orgs"
           echo "-----------------------------------------"
 
-          for org in $orgs; do
-            echo "🏛 ORGANIZACIÓN: $org"
-            echo "Repositorios en $org:"
-            echo "-----------------------------------------"
+          if [ -z "$orgs" ]; then
+            echo "⚠️ No se encontraron organizaciones o tu token no tiene permisos 'read:org'."
+          else
+            for org in $orgs; do
+              echo "🏛 ORGANIZACIÓN: $org"
+              echo "Repositorios en $org:"
+              echo "-----------------------------------------"
 
-            org_repos=$(gh repo list $org --limit 300 --json name --jq '.[].name')
+              org_repos=$(gh repo list $org --limit 300 --json name --jq '.[].name')
 
-            if [ -z "$org_repos" ]; then
-              echo "⚠️ No se encontraron repos en esta organización."
-            else
-              echo "$org_repos"
-            fi
+              if [ -z "$org_repos" ]; then
+                echo "⚠️ No se encontraron repos en esta organización."
+              else
+                echo "$org_repos"
+              fi
 
-            echo "========================================="
-          done
+              echo "========================================="
+            done
+          fi
 
+      # -------------------------------------------------------------------
+      # 2. LISTAR REPOS Y RAMAS DEL USUARIO
+      # -------------------------------------------------------------------
       - name: Listar repos y ramas del usuario
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           echo "🔍 Obteniendo lista de repositorios del usuario..."
 
-          # Obtener todos los repositorios del usuario
           repos=$(gh repo list ReneML12 --limit 200 --json name --jq '.[].name')
 
           echo "📌 Repos encontrados del usuario:"
           echo "$repos"
           echo "-----------------------------------------"
 
-          # Recorrer todos los repositorios
           for repo in $repos; do
             echo "📁 REPO: $repo"
             echo "-----------------------------------------"
 
             # Obtener ramas del repo
-            branches=$(gh api repos/ReneML12/$repo/branches --jq '.[].name')
+            branches=$(gh api repos/ReneML12/$repo/branches --jq '.[].name' || echo "")
 
-            # Validar si tiene ramas
             if [ -z "$branches" ]; then
               echo "⚠️ No se encontraron ramas en $repo"
             else
               echo "🌿 Ramas encontradas en $repo:"
               for branch in $branches; do
-                # Obtener información detallada de cada rama
-                last_commit=$(gh api repos/ReneML12/$repo/branches/$branch --jq '.commit.sha')
-                last_date=$(gh api repos/ReneML12/$repo/commits/$last_commit --jq '.commit.author.date')
+
+                # Obtener último commit
+                last_commit=$(gh api repos/ReneML12/$repo/branches/$branch --jq '.commit.sha' || echo "")
+
+                if [ -z "$last_commit" ]; then
+                  echo " - Rama: $branch"
+                  echo "   ⚠️ No se pudo obtener el último commit."
+                  continue
+                fi
+
+                last_date=$(gh api repos/ReneML12/$repo/commits/$last_commit --jq '.commit.author.date' || echo "Fecha desconocida")
 
                 echo " - Rama: $branch"
                 echo "   Último commit: $last_commit"
